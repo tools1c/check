@@ -1,16 +1,27 @@
 (function () {
-    const GERMAN_SERVER = "https://support1c.videocourses.xyz";  
-    const RU_PROXY = "https://support1c-ru.videocourses.xyz";   
-    const TIMEOUT_MS = 8000;                               // увеличен таймаут для медленного сервера
-    const CHECK_INTERVAL_MS = 60 * 60 * 1000;              // 1 час
+    const TIMEOUT_MS = 8000;
+    const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-    // Если уже на русском сервере (любой поддомен) — ничего не делаем
+    const hostnameParts = window.location.hostname.split(".");
+    const mainDomain = hostnameParts.slice(-3).join("."); // видеокурсный домен без поддомена
+    const userSubdomain = hostnameParts.length > 3 ? hostnameParts[0] : "";
+
+    // Формируем URL немецкого и русского сервера
+    const GERMAN_SERVER = userSubdomain
+        ? `https://${userSubdomain}.support1c.videocourses.xyz`
+        : `https://support1c.videocourses.xyz`;
+
+    const RU_PROXY = userSubdomain
+        ? `https://${userSubdomain}.support1c-ru.videocourses.xyz`
+        : `https://support1c-ru.videocourses.xyz`;
+
+    // Если уже на русском сервере — ничего не делаем
     if (window.location.hostname.includes("support1c-ru.videocourses.xyz")) return;
 
     const lastCheck = localStorage.getItem("german_last_check");
     const lastOk = localStorage.getItem("german_last_ok");
 
-    // Если меньше часа назад сервер уже был помечен как мёртвый → редирект сразу
+    // Если меньше часа назад сервер был мёртвый → редирект сразу
     if (lastCheck && (Date.now() - parseInt(lastCheck, 10) < CHECK_INTERVAL_MS) && lastOk === "0") {
         window.location.href = RU_PROXY + window.location.pathname + window.location.search;
         return;
@@ -21,7 +32,7 @@
         return;
     }
 
-    // Сразу помечаем сервер как "мертвый", чтобы защититься от обрыва браузера
+    // Сразу помечаем сервер как "мертвый"
     localStorage.setItem("german_last_ok", "0");
     localStorage.setItem("german_last_check", Date.now().toString());
 
@@ -29,7 +40,7 @@
         return new Promise((resolve, reject) => {
             const img = new Image();
             const timer = setTimeout(() => {
-                img.src = ""; // Прерываем загрузку
+                img.src = "";
                 reject(new Error("timeout"));
             }, timeout);
 
@@ -43,19 +54,15 @@
                 reject(new Error("error"));
             };
 
-            // Кэш отключаем
             img.src = url + "/static/conf/img/test.png?ts=" + Date.now();
         });
     }
 
-    // Запускаем проверку немецкого сервера
     checkServerViaImage(GERMAN_SERVER)
         .then(() => {
-            // Немецкий сервер живой → обновляем статус
             localStorage.setItem("german_last_ok", "1");
         })
         .catch(() => {
-            // Сервер не ответил — редирект на RU
             window.location.href = RU_PROXY + window.location.pathname + window.location.search;
         });
 })();
